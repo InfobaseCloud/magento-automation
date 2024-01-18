@@ -41,11 +41,11 @@ variable "tags" {
 variable "endpoint" {
   type        = string
   description = "Endpoint to send notifications to."
-  default     = null
+  default     = "test-notifications-aaaal2efgn7ci34osq4bnh3hem@infobasedigital.slack.com"
 }
 
 variable "instance_ids" {
   description = "List of EC2 instance IDs"
   type        = list(string)
-  default     = ["i-000c7acd01818f5eb"]
+  default     = []
 }

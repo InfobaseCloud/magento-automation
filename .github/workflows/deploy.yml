@@ -40,7 +40,7 @@ jobs:
             if [[ ${branch} == 'production' ]];
             then
             ENVIRONMENT=prod
-            elif [[ ${branch} == 'dev' || 'feature/Refactor' ]];
+            elif [[ ${branch} == 'dev' || 'OPS-8' ]];
             then
             ENVIRONMENT=dev
             elif
@@ -154,13 +154,17 @@ jobs:
         working-directory: ./terraform
 
       - name: Terraform Apply
+        if: env.APPLY_ENABLD == 'true'
         id: apply
         run: |- 
          terraform apply "PLAN"
         working-directory: ./terraform
+        env:
+          APPLY_ENABLED: false
 
       - name: Terraform Output
         id: output
         run: terraform output -json
+  
 
  
