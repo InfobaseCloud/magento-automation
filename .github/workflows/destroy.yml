@@ -1,0 +1,232 @@
+name: Infrastructure Deploy
+on:  
+ workflow_call:
+    inputs:
+        AWS_REGION:
+            type: string
+            required: false
+            default: "us-east-1"
+        TF_STATE:
+            type: string
+            required: true
+            default: ""
+        TF_DESTROY_ENABLED:
+            description: "Controls if terraform destroy job is enabled"
+            type: boolean
+            default: false
+
+jobs:
+  generate-vars:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.ref_name }}
+    env:
+      AWS_REGION: us-east-1
+      ECR_REPOSITORY_IMAGENAME: creed-discovery
+    outputs:
+      AWS_REGION: ${{ steps.vars.outputs.AWS_REGION }}
+      ENVIRONMENT: ${{ steps.vars.outputs.ENVIRONMENT }}
+      ECR_REPOSITORY_IMAGENAME: ${{ steps.vars.outputs.ECR_REPOSITORY_IMAGENAME }}
+      ECR_REPOSITORY: ${{ steps.vars.outputs.ECR_REPOSITORY }}
+      TF_STATE_KEY: ${{ steps.vars.outputs.TF_STATE_KEY }}
+      TF_STATE_BUCKET_NAME : ${{ steps.vars.outputs.TF_STATE_BUCKET_NAME }}
+      TF_VARS_FILE: ${{ steps.vars.outputs.TF_VARS_FILE }}
+    steps:
+      - name: Extract Branch Name
+        id: branch
+        run: echo "BRANCH=$(echo ${GITHUB_REF##*/})" >> $GITHUB_ENV
+
+      - name: Create variables
+        id: vars
+        run: |
+          branch=${GITHUB_REF##*/}
+          REPO_NAME=${GITHUB_REPOSITORY#*/}
+          echo "branch=${branch}" >> $GITHUB_OUTPUT
+          echo "REPO_NAME=${GITHUB_REPOSITORY#*/}" >> $GITHUB_OUTPUT
+
+            if [[ ${branch} == 'production' ]];
+            then
+            ENVIRONMENT=prod
+            elif [[ ${branch} == 'dev' || 'feature/Refactor' ]];
+            then
+            ENVIRONMENT=dev
+            elif
+            [[ ${branch} == 'uat' ]];
+            then
+            ENVIRONMENT=uat
+            elif
+            [[ ${branch} == 'staging' ]];
+            then
+            ENVIRONMENT=staging
+            fi
+          
+          ECR_REPOSITORY=creed-discovery-${ENVIRONMENT}
+          AWS_REGION=us-east-1
+          ECR_REPOSITORY_IMAGENAME=creed-discovery
+          TF_STATE_BUCKET_NAME=ibops-cicd-tfstate-${ENVIRONMENT}
+          TF_STATE_KEY=${REPO_NAME}/${ENVIRONMENT}/terraform.tfstate
+          TF_VARS_FILE=environments/${ENVIRONMENT}/${ENVIRONMENT}.tfvars
+          echo "TF_STATE_KEY=${TF_STATE_KEY}" >> $GITHUB_OUTPUT 
+          echo "ENVIRONMENT=${ENVIRONMENT}" >> $GITHUB_OUTPUT 
+          echo "ECR_REPOSITORY=${ECR_REPOSITORY}" >> $GITHUB_OUTPUT 
+          echo "TF_STATE_BUCKET_NAME=${TF_STATE_BUCKET_NAME}" >> $GITHUB_OUTPUT 
+          echo "TF_VARS_FILE=${TF_VARS_FILE}" >> $GITHUB_OUTPUT
+          echo "ENVIRONMENT=${ENVIRONMENT}" >> $GITHUB_OUTPUT
+          echo "ECR_REPOSITORY_IMAGENAME=${ECR_REPOSITORY_IMAGENAME}" >> $GITHUB_OUTPUT
+          echo "AWS_REGION=${AWS_REGION}" >> $GITHUB_OUTPUT
+
+  define_aws_role:
+    needs: [generate-vars]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    environment:
+      name: ${{ github.ref_name }}
+    outputs:
+      AWS_IAM_ROLE: ${{ steps.environment.outputs.AWS_IAM_ROLE }}
+
+    steps:
+
+      - name: Define Environment and set AWS IAM ROLE
+        id: environment
+        env: 
+          ENVIRONMENT: ${{needs.generate-vars.outputs.ENVIRONMENT }}
+        run: |
+          if [[ ${ENVIRONMENT} == "dev" ]];
+          then
+          AWS_IAM_ROLE='arn:aws:iam::766917365927:role/autodeploy'
+          elif [[ (${ENVIRONMENT} == "production")  || (${ENVIRONMENT} == "prod")  ]];
+          then
+          AWS_IAM_ROLE='arn:aws:iam::815610158045:role/autodeploy'
+          fi
+          echo "AWS_IAM_ROLE=${AWS_IAM_ROLE}" >> $GITHUB_OUTPUT
+
+ 
+  build_and_push:
+    needs: [define_aws_role, generate-vars]
+    runs-on: windows-latest
+    permissions:
+      id-token: write
+      contents: read
+    environment:
+      name: ${{ github.ref_name }}
+    outputs:
+      ECR_REGISTRY: ${{ steps.login-aws-ecr.outputs.registry}}
+    steps:
+
+      - name: checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ needs.define_aws_role.outputs.AWS_IAM_ROLE }}
+          role-skip-session-tagging: true
+          role-session-name: deploy
+          aws-region: ${{needs.generate-vars.outputs.AWS_REGION }}
+          output-credentials: true
+
+      - name: Login to Amazon ECR
+        id: login-aws-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: 'true'
+
+      - name: Build and push the tagged docker image to Amazon ECR
+        if: env.BUILD_ENABLE == 'true'
+        id: build
+        env:
+          ECR_REGISTRY:  ${{ steps.login-aws-ecr.outputs.registry}}
+          ECR_REPOSITORY: ${{needs.generate-vars.outputs.ECR_REPOSITORY }}
+          ECR_REPOSITORY_IMAGENAME: ${{needs.generate-vars.outputs.ECR_REPOSITORY_IMAGENAME }}
+          BUILD_ENABLE: true
+        run: |
+          echo "image=${{env.ECR_REGISTRY}}/${{env.ECR_REPOSITORY}}:${{ env.ECR_REPOSITORY_IMAGENAME }}-${{ github.sha }}" >> $GITHUB_OUTPUT
+          cd CreedDiscovery/src
+          docker build -f Dockerfile -t ${{env.ECR_REGISTRY}}/${{env.ECR_REPOSITORY}}:${{ env.ECR_REPOSITORY_IMAGENAME }}-${{ github.sha }} .
+          docker push ${{env.ECR_REGISTRY}}/${{env.ECR_REPOSITORY}}:${{ env.ECR_REPOSITORY_IMAGENAME }}-${{ github.sha }}
+
+      
+  deploy:
+    needs: [build_and_push,generate-vars, define_aws_role]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    environment:
+      name: ${{ github.ref_name }}
+    env:
+        ECR_REGISTRY:  ${{ needs.build_and_push.outputs.ECR_REGISTRY}}
+        ECR_REPOSITORY: ${{needs.generate-vars.outputs.ECR_REPOSITORY }}
+        TF_STATE_BUCKET_NAME: ${{ needs.generate-vars.outputs.TF_STATE_BUCKET_NAME }}
+        TF_STATE_KEY: ${{ needs.generate-vars.outputs.TF_STATE_KEY }}
+        TF_VARS_FILE: ${{needs.generate-vars.outputs.TF_VARS_FILE }}
+        TF_VAR_image_tag: ${{needs.generate-vars.outputs.ECR_REPOSITORY_IMAGENAME }}-${{ github.sha }}
+        TF_VAR_cms_records_connections: ${{ secrets.CMS_RECORDS_CONNECTIONS }}
+
+    steps:
+
+
+      - name: checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS Credentials 2
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ needs.build_and_push.outputs.aws-access-key-id }}
+          aws-secret-access-key: ${{ needs.build_and_push.outputs.aws-secret-access-key }}
+          aws-session-token: ${{ needs.build_and_push.outputs.aws-session-token }}
+          role-to-assume: ${{ needs.define_aws_role.outputs.AWS_IAM_ROLE }}
+          aws-region: ${{needs.generate-vars.outputs.AWS_REGION }}
+
+
+      - name: setup terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform Format
+        id: fmt
+        run: terraform fmt -check
+        continue-on-error: true
+
+      - name: Terraform Init
+        id: init
+        run: |-
+          terraform init -backend-config="bucket=${TF_STATE_BUCKET_NAME}" \
+            -backend-config="key=${TF_STATE_KEY}"\
+            -backend-config="region=${TF_AWS_REGION}"\
+            -backend-config="dynamodb_table=${TF_STATE_BUCKET_NAME}"
+        working-directory: ./terraform
+
+      - name: Terraform Validate 
+        id: validate
+        run: terraform validate 
+
+      - name: Terraform Plan
+        id: plan
+        run: |-
+          terraform plan \
+          -var-file="${TF_VARS_FILE}" \
+          -out=PLAN
+        working-directory: ./terraform
+
+      - name: Terraform destroy
+        if: ${{ inputs.TF_DESTROY_ENABLED }}
+        id: destroy
+        run: |- 
+            terraform apply -destroy \
+            -var-file="${TF_VARS_FILE}" \
+            -auto-approve
+        working-directory: ./terraform
+
+      - name: Terraform Output
+        id: output
+        run: terraform output -json
+
+ 
