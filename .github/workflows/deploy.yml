@@ -154,7 +154,7 @@ jobs:
         working-directory: ./terraform
 
       - name: Terraform Apply
-        if: env.APPLY_ENABLD == 'true'
+        if: env.APPLY_ENABLED == 'true'
         id: apply
         run: |- 
          terraform apply "PLAN"
