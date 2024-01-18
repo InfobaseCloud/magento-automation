@@ -5,7 +5,7 @@ locals {
 # EC2 System failures
 resource "aws_cloudwatch_metric_alarm" "system_failure" {
   for_each            = local.ec2
-  alarm_name          = "The each.key is not responding, will proceed to reboot"
+  alarm_name          = "The ${each.key} is not responding, will proceed to reboot"
   alarm_description   = "The EC2 Status check has failed for ${each.key}"
   comparison_operator = "GreaterThanOrEqualToThreshold"
   threshold           = 1
