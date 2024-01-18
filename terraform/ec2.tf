@@ -5,7 +5,7 @@ locals {
 # EC2 System failures
 resource "aws_cloudwatch_metric_alarm" "system_failure" {
   for_each            = local.ec2
-  alarm_name          = "EC2-System-Failure-for-${each.keyg}"
+  alarm_name          = "EC2-System-Failure-for-${each.key}"
   alarm_description   = "The Magento instance (${each.key}) is not responding, will proceed to reboot"
   comparison_operator = "GreaterThanOrEqualToThreshold"
   threshold           = 1
