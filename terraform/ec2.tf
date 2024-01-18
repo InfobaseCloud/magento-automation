@@ -5,7 +5,7 @@ locals {
 # EC2 System failures
 resource "aws_cloudwatch_metric_alarm" "system_failure" {
   for_each            = local.ec2
-  alarm_name          = each.key
+  alarm_name          = "The each.key is not responding, will proceed to reboot"
   alarm_description   = "The EC2 Status check has failed for ${each.key}"
   comparison_operator = "GreaterThanOrEqualToThreshold"
   threshold           = 1
@@ -21,6 +21,10 @@ resource "aws_cloudwatch_metric_alarm" "system_failure" {
   alarm_actions = [
     aws_sns_topic.this.arn,
     "arn:aws:automate:${data.aws_region.current.name}:ec2:reboot"
+  ]
+
+  depends_on = [
+    aws_sns_topic.this
   ]
 }
 
