@@ -41,7 +41,7 @@ variable "tags" {
 variable "endpoint" {
   type        = string
   description = "Endpoint to send notifications to."
-  default     = "test-notifications-aaaal2efgn7ci34osq4bnh3hem@infobasedigital.slack.com"
+  default     = "pingdom-alerts-aaaadh4vbatzhult2sw6jrmchq@infobasedigital.slack.com"
 }
 
 variable "instance_ids" {
