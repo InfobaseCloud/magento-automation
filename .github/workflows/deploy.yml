@@ -160,7 +160,7 @@ jobs:
          terraform apply "PLAN"
         working-directory: ./terraform
         env:
-          APPLY_ENABLED: true
+          APPLY_ENABLED: false
 
       - name: Terraform Output
         id: output
