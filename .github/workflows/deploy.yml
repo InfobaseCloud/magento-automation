@@ -1,8 +1,6 @@
 name: Infrastructure Deploy
 on:  
   push:
-    branches: 
-       - OPS-8
     tags:
        - develop
        - production
@@ -160,7 +158,7 @@ jobs:
          terraform apply "PLAN"
         working-directory: ./terraform
         env:
-          APPLY_ENABLED: false
+          APPLY_ENABLED: true
 
       - name: Terraform Output
         id: output
