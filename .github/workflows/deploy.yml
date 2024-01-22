@@ -80,14 +80,15 @@ jobs:
         env: 
           ENVIRONMENT: ${{needs.generate-vars.outputs.ENVIRONMENT }}
         run: |
-          if [[ ${ENVIRONMENT} == 'dev' ]];
-          then
-          AWS_IAM_ROLE='arn:aws:iam::766917365927:role/autodeploy'
-          elif [[ ${ENVIRONMENT} == 'production' ]];
-          then
-          AWS_IAM_ROLE='arn:aws:iam::815610158045:role/autodeploy'
+          if [[ (${ENVIRONMENT} = "dev") || (${ENVIRONMENT} = "uat")]];
+           then  AWS_IAM_ROLE='arn:aws:iam::766917365927:role/autodeploy'
+          elif [[ (${ENVIRONMENT} = "prod") || (${ENVIRONMENT} = "production")]];
+            then AWS_IAM_ROLE='arn:aws:iam::815610158045:role/autodeploy'
           fi
           echo "AWS_IAM_ROLE=${AWS_IAM_ROLE}" >> $GITHUB_OUTPUT
+          echo $AWS_IAM_ROLE
+
+
       
   deploy:
     needs: [generate-vars, define_aws_role]
