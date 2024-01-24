@@ -15,6 +15,7 @@ on:
             description: "Controls if terraform destroy job is enabled"
             type: boolean
             default: false
+            required: true
 
 jobs:
   generate-vars:
