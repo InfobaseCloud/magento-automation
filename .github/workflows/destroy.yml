@@ -1,6 +1,6 @@
 name: Infrastructure Destroy
 on:  
- workflow_:
+ workflow_dispatch:
     inputs:
         AWS_REGION:
             type: string
