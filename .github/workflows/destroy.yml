@@ -40,23 +40,6 @@ jobs:
           REPO_NAME=${GITHUB_REPOSITORY#*/}
           echo "branch=${branch}" >> $GITHUB_OUTPUT
           echo "REPO_NAME=${GITHUB_REPOSITORY#*/}" >> $GITHUB_OUTPUT
-
-            if [[ ${branch} == 'production' ]];
-            then
-            ENVIRONMENT=prod
-            elif [[ ${branch} == 'dev' || 'feature/Refactor' ]];
-            then
-            ENVIRONMENT=dev
-            elif
-            [[ ${branch} == 'uat' ]];
-            then
-            ENVIRONMENT=uat
-            elif
-            [[ ${branch} == 'staging' ]];
-            then
-            ENVIRONMENT=staging
-            fi
-
           TF_STATE_BUCKET_NAME=ibops-cicd-tfstate-${ENVIRONMENT}
           TF_STATE_KEY=${REPO_NAME}/${ENVIRONMENT}/terraform.tfstate
           TF_VARS_FILE=environments/${ENVIRONMENT}/${ENVIRONMENT}.tfvars
