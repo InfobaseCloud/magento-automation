@@ -1,12 +1,13 @@
 name: Infrastructure Destroy
 on:  
- workflow_call:
+ workflow_dispatch:
     inputs:
         AWS_REGION:
             type: string
             required: false
             default: "us-east-1"
-        TF_STATE:
+        ENVIRONMENT:
+            description: "Environment to destroy"
             type: string
             required: true
             default: ""
@@ -19,12 +20,11 @@ jobs:
   generate-vars:
     runs-on: ubuntu-latest
     environment:
-      name: ${{ github.ref_name }}
+      name: ${{ inputs.ENVIRONMENT }}
     env:
       AWS_REGION: us-east-1
+      ENVIRONMENT: ${{ inputs.ENVIRONMENT }}
     outputs:
-      AWS_REGION: ${{ steps.vars.outputs.AWS_REGION }}
-      ENVIRONMENT: ${{ steps.vars.outputs.ENVIRONMENT }}
       TF_STATE_KEY: ${{ steps.vars.outputs.TF_STATE_KEY }}
       TF_STATE_BUCKET_NAME : ${{ steps.vars.outputs.TF_STATE_BUCKET_NAME }}
       TF_VARS_FILE: ${{ steps.vars.outputs.TF_VARS_FILE }}
@@ -56,8 +56,7 @@ jobs:
             then
             ENVIRONMENT=staging
             fi
-          
-          AWS_REGION=us-east-1
+
           TF_STATE_BUCKET_NAME=ibops-cicd-tfstate-${ENVIRONMENT}
           TF_STATE_KEY=${REPO_NAME}/${ENVIRONMENT}/terraform.tfstate
           TF_VARS_FILE=environments/${ENVIRONMENT}/${ENVIRONMENT}.tfvars
@@ -75,7 +74,7 @@ jobs:
       id-token: write
       contents: read
     environment:
-      name: ${{ github.ref_name }}
+      name: ${{ inputs.ENVIRONMENT }}
     outputs:
       AWS_IAM_ROLE: ${{ steps.environment.outputs.AWS_IAM_ROLE }}
 
@@ -84,7 +83,7 @@ jobs:
       - name: Define Environment and set AWS IAM ROLE
         id: environment
         env: 
-          ENVIRONMENT: ${{needs.generate-vars.outputs.ENVIRONMENT }}
+          ENVIRONMENT: ${{ inputs.ENVIRONMENT }}
         run: |
             if [[ (${ENVIRONMENT} = "dev") || (${ENVIRONMENT} = "uat")]];
             then  AWS_IAM_ROLE='arn:aws:iam::766917365927:role/autodeploy'
@@ -102,7 +101,7 @@ jobs:
       id-token: write
       contents: read
     environment:
-      name: ${{ github.ref_name }}
+      name: ${{ inputs.ENVIRONMENT }}
     env:
         TF_STATE_BUCKET_NAME: ${{ needs.generate-vars.outputs.TF_STATE_BUCKET_NAME }}
         TF_STATE_KEY: ${{ needs.generate-vars.outputs.TF_STATE_KEY }}
@@ -122,7 +121,7 @@ jobs:
           role-to-assume: ${{ needs.define_aws_role.outputs.AWS_IAM_ROLE }}
           role-skip-session-tagging: true
           role-session-name: deploy
-          aws-region: ${{needs.generate-vars.outputs.AWS_REGION }}
+          aws-region: ${{ inputs.ENVIRONMENT }}
           output-credentials: true
 
 
