@@ -6,7 +6,7 @@ on:
             type: string
             required: false
             default: "us-east-1"
-        TF_STATE:
+        ENVIRONMENT:
             type: string
             required: true
             default: ""
@@ -19,12 +19,12 @@ jobs:
   generate-vars:
     runs-on: ubuntu-latest
     environment:
-      name: ${{ github.ref_name }}
+      name: ${{ inputs.ENVIRONMENT }}
     env:
       AWS_REGION: us-east-1
     outputs:
       AWS_REGION: ${{ steps.vars.outputs.AWS_REGION }}
-      ENVIRONMENT: ${{ steps.vars.outputs.ENVIRONMENT }}
+      ENVIRONMENT: ${{ inputs.ENVIRONMENT }}
       TF_STATE_KEY: ${{ steps.vars.outputs.TF_STATE_KEY }}
       TF_STATE_BUCKET_NAME : ${{ steps.vars.outputs.TF_STATE_BUCKET_NAME }}
       TF_VARS_FILE: ${{ steps.vars.outputs.TF_VARS_FILE }}
